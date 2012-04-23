@@ -129,14 +129,23 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
   typedef rule<Iterator, unused_type, space_type> newLine_rule_type;
   typedef rule<Iterator, string(), space_type> simple_string_rule_type;
   
+  private:
+    struct addLabel
+    {
+      Program* ast;
+      void operator()(string& name, typename label_rule_type::context_type& context)
+      {
+        boost::fusion::at_c<0>(context.attributes) = ast->addLabel(name);
+      }
+    };
+  public:
+      
+  
   DCPU16AssemblyGrammar(Program* ast) : DCPU16AssemblyGrammar::base_type(start)
   {
     _ast = ast;
     start = *(line[[](unused_type) {}]);
-    label = lit(':') > symbol[[&](string& name, typename label_rule_type::context_type& context) 
-				  {  
-				   boost::fusion::at_c<0>(context.attributes) = _ast->addLabel(name);
-				  }];
+    label = lit(':') > symbol[addLabel { _ast }];
     
     line = newLine
       | comment
