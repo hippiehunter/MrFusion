@@ -1,0 +1,2 @@
+Mr Fusion is an Assembler for the DCPU16 that is capable of producing the debugging symbols used in Flux-Capacitor.
+Mr Fusion is implemented using a boost::spirit::qi based parser. It makes multiple passes over the produced AST and has the ability to generate mostly(as long as you dont try to confuse it by jumping to a register that has an unknowable value) relocatable binaries. 
