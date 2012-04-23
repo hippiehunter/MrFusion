@@ -12,7 +12,6 @@ namespace Parser
   struct Program;
   struct Line;
   struct Label;
-  struct Operand;
   struct Data;
   struct Instruction;
   
@@ -68,30 +67,6 @@ namespace Parser
     JSR
   };
 
-  struct Program
-  {
-  public:
-    ~Program();
-    
-    Line* currentLine();
-    std::string* currentFileName();
-    
-    void addNewLine();
-    Label* addLabel(const std::string& labelName);
-    void addData(Data* data);
-    void addInstruction(Instruction* instruction);
-    void addError(const std::string& message);
-    
-    void writeSymbols(std::ofstream& file);
-    void writeBinary(std::ofstream& file);
-  private:
-    std::vector<std::string*> _fileNames;
-    std::vector<Line*> _lines;
-    std::map<std::string, Label*> _labels;
-    std::vector<Data*> _dataLiterals;
-    std::vector<Instruction*> _instructions;
-  };
-
   struct Line
   {
     int lineNumber;
@@ -113,6 +88,8 @@ namespace Parser
   
   struct RegisterOperand
   {
+    RegisterOperand() {}
+    RegisterOperand(Register reg_) : reg(reg_) {}
     Register reg;
   };
   
@@ -141,6 +118,11 @@ namespace Parser
   
   struct DerefOperand
   {
+    DerefOperand() {}
+    DerefOperand(Register reg)
+    {
+      target = RegisterOperand(reg);
+    }
     boost::variant<RegisterOperand, LiteralOperand, LabelOperand, ExpressionOperand> target;
   };
   
@@ -150,14 +132,41 @@ namespace Parser
     boost::optional<uint16_t> computedAddress;
   };
   
-  
+  typedef boost::variant<RegisterOperand, LiteralOperand, LabelOperand, ExpressionOperand, DerefOperand, SpecialOperand> Operand;
   
   struct Instruction
   {
-      Opcode opCode;
-      boost::variant<RegisterOperand, LiteralOperand, LabelOperand, ExpressionOperand, DerefOperand, SpecialOperand> first;
-      boost::variant<RegisterOperand, LiteralOperand, LabelOperand, ExpressionOperand, DerefOperand, SpecialOperand> second;
-      boost::optional<uint16_t> computedAddress;
+    Opcode opCode;
+    Operand first;
+    Operand second;
+    boost::optional<uint16_t> computedAddress;
+  };
+  
+  struct Program
+  {
+  public:
+    ~Program();
+    
+    Line* currentLine();
+    std::string* currentFileName();
+    
+    Line* addNewLine();
+    Label* addLabel(const std::string& labelName);
+    Data* addData(std::vector<uint16_t> data);
+    Data* addData(std::string data);
+    Instruction* addInstruction(Opcode op, Operand& opr1);
+    Instruction* addInstruction(Opcode op, Operand& opr1, Operand& opr2);
+    void addError(const std::string& message);
+    
+    void writeSymbols(std::ofstream& file);
+    void writeBinary(std::ofstream& file);
+  private:
+    std::vector<boost::variant<Line*, Label*, Data*, Instruction*>> _parsedStream;
+    std::vector<std::string*> _fileNames;
+    std::vector<Line*> _lines;
+    std::map<std::string, Label*> _labels;
+    std::vector<Data*> _dataLiterals;
+    std::vector<Instruction*> _instructions;
   };
  
 }
