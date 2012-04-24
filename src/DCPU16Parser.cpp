@@ -51,14 +51,14 @@ struct gpRegisters_ : symbols<char, Register>
 
 } gpRegisters;
 
-struct specialOperands_ : symbols<char, Register>
+struct specialOperands_ : symbols<char, SpecialOperandType>
 {
   specialOperands_()
   {
     add
-      ("PUSH", Register::A)
-      ("POP", Register::B)
-      ("PEEK", Register::C)
+      ("PUSH", SpecialOperandType::PUSH)
+      ("POP", SpecialOperandType::POP)
+      ("PEEK", SpecialOperandType::PEEK)
     ;
   }
 
@@ -128,7 +128,98 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
   typedef rule<Iterator, variant<Data*, Instruction*>(), space_type> statement_rule_type;
   typedef rule<Iterator, unused_type, space_type> newLine_rule_type;
   typedef rule<Iterator, string(), space_type> simple_string_rule_type;
-      
+  
+  //partialy compatible variant assignment visitor
+  //it takes a compatible subset variant and assigns it to a superset variant
+  template<typename Target>
+  struct pcv_assign
+  : public boost::static_visitor<>
+  {
+  public:
+      pcv_assign(boost::optional<Target>& target_) : target(target_) {}
+    
+      boost::optional<Target>& target;
+      template <typename T>
+      void operator()( T & operand ) const
+      {
+	  target.reset(operand);
+      }
+
+  };
+  
+  template<typename Context>
+  struct operandUtil
+  {
+  public:
+    void operator()(Register reg, typename Context::context_type& context, qi::unused_type)
+    {
+      boost::fusion::at_c<0>(context.attributes) = RegisterOperand(reg);
+    }
+    void operator()(SpecialOperandType spOp, typename Context::context_type& context, qi::unused_type)
+    {
+      boost::fusion::at_c<0>(context.attributes) = SpecialOperand { spOp };
+    }
+    void operator()(DerefOperand& opr, typename Context::context_type& context, qi::unused_type)
+    {
+      boost::fusion::at_c<0>(context.attributes) = opr;
+    }
+    void operator()(variant<uint16_t, string>& var, typename Context::context_type& context, qi::unused_type)
+    {
+      struct expressionAssign
+      : public boost::static_visitor<>
+      {
+      public:
+	  Operand& target;
+	  void operator()( string & operand ) const
+	  {
+	      target = LabelOperand { operand, nullptr};
+	  }
+	  void operator()( uint16_t operand ) const
+	  {
+	    target = LiteralOperand { operand };
+	  }
+
+      };
+      boost::apply_visitor(expressionAssign { boost::fusion::at_c<0>(context.attributes) }, var); 
+    }
+  };
+  
+  template<typename Context, int pos>
+  struct exprUtil
+  {
+    void operator()(Register reg, typename Context::context_type& context, unused_type&)
+    {
+      boost::fusion::at_c<0>(context.attributes) = RegisterOperand { reg };
+    }
+    void operator()(variant<uint16_t, string> var, typename Context::context_type& context, unused_type&)
+    {
+      struct expressionAssign
+      : public boost::static_visitor<>
+      {
+      public:
+	  ExpressionOperand& target;
+	  void operator()( string & operand ) const
+	  {
+	    if(pos == 0)
+	      target.first = LabelOperand { operand, nullptr};
+	    else
+	      target.second = LabelOperand { operand, nullptr};
+	  }
+	  void operator()( uint16_t operand ) const
+	  {
+	      if(pos == 0)
+		target.first = LiteralOperand { operand };
+	      else
+		target.second = LiteralOperand { operand };
+	  }
+
+      };
+      ExpressionOperand expResult;
+      boost::apply_visitor(expressionAssign { expResult }, var); 
+      boost::fusion::at_c<0>(context.attributes) = DerefOperand { expResult };
+    }
+  };
+  
   
   DCPU16AssemblyGrammar(Program* ast) : DCPU16AssemblyGrammar::base_type(start)
   {
@@ -136,8 +227,44 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
       {
         boost::fusion::at_c<0>(context.attributes) = ast->addLabel(name);
       };
-    
-    
+      
+    auto attachStatement = [](variant<Data*, Instruction*>& stmt, typename line_rule_type::context_type& context)
+      {
+	if(boost::fusion::at_c<0>(context.attributes)->contents)
+	{
+	  auto currentLabel = boost::get<Label*>(boost::fusion::at_c<0>(context.attributes)->contents.get());
+	  currentLabel->target = stmt;
+	}
+	else
+	{
+	  boost::apply_visitor(pcv_assign<boost::variant<Data*, Instruction*, Label*>> ( boost::fusion::at_c<0>(context.attributes)->contents ), stmt);
+	}
+      };
+      
+    auto attachLabel = [](Label* lbl, typename line_rule_type::context_type& context)
+      {
+	boost::fusion::at_c<0>(context.attributes)->contents = lbl;
+      };
+      
+    auto attachOpcode = [](Opcode op, typename instr_rule_type::context_type& context)
+      {
+	boost::fusion::at_c<0>(context.attributes)->opCode = op;
+      };
+      
+    auto attachOperand1 = [](Operand& op, typename instr_rule_type::context_type& context)
+      {
+	boost::fusion::at_c<0>(context.attributes)->first = op;
+      };
+      
+    auto attachOperand2 = [](Operand& op, typename instr_rule_type::context_type& context)
+      {
+	boost::fusion::at_c<0>(context.attributes)->second = op;
+      };
+      
+    auto attachDatList = [](vector<uint16_t>& raw, typename dat_rule_type::context_type& context)
+      {
+	boost::fusion::at_c<0>(context.attributes)->value = raw; 
+      };
     
     _ast = ast;
     start = *(line[[](unused_type) {}]);
@@ -145,24 +272,25 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
     
     line = newLine
       | comment
-      | statement >> -(comment) >> newLine
-      | label >> statement >> -(comment) >> newLine;
+      | statement[attachStatement] >> -(comment) >> -(newLine)
+      | label[attachLabel] >> statement[attachStatement] >> -(comment) >> -(newLine)
+      | label[attachLabel] >> -(newLine);
       
     statement = dat
       | instr;
       
-    instr = no_case[binaryOpcodes] > operand > ',' > operand
-      | no_case[unaryOpcodes] > operand;
+    instr = no_case[binaryOpcodes[attachOpcode]] > operand[attachOperand1] > ',' > operand[attachOperand2]
+      | no_case[unaryOpcodes[attachOpcode]] > operand[attachOperand1];
       
-    operand = no_case[specialOperands]
-      | no_case[gpRegisters]
-      | expr
-      | operand_deref;
+    operand = no_case[specialOperands[operandUtil<operand_rule_type>()]]
+      | no_case[gpRegisters[operandUtil<operand_rule_type>()]]
+      | expr[operandUtil<operand_rule_type>()]
+      | operand_deref[operandUtil<operand_rule_type>()];
       
-    operand_deref = lit('[') >> no_case[gpRegisters] >> ']'
-      | lit('[') >> expr >> ']'
-      | lit('[') >> expr >> '+' >> no_case[gpRegisters] >> ']'
-      | lit('[') >> no_case[gpRegisters] >> '+' >> expr >> ']';
+    //operand_deref = lit('[') >> no_case[gpRegisters[operandUtil<operand_deref_rule_type>()]] >> ']'
+    //  | lit('[') >> expr[operandUtil<operand_rule_type>()] >> ']'
+    //  | lit('[') >> expr[exprUtil<operand_rule_type, 0>()] >> '+' >> no_case[gpRegisters[exprUtil<operand_rule_type, 1>()]] >> ']'
+    //  | lit('[') >> no_case[gpRegisters[exprUtil<operand_rule_type, 0>()]] >> '+' >> expr[exprUtil<operand_rule_type, 1>()] >> ']';
       
     symbol %= alpha >> *(alnum);
     
@@ -170,7 +298,7 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
       | lexeme[no_case["0x"] > hex]
       | ushort_;
       
-    dat = lexeme[no_case["dat"]] > datlist;
+    dat = lexeme[no_case["dat"]] > datlist[attachDatList];
     
     datlist = quoted_string
       | dat_elem % ',';
@@ -179,7 +307,7 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
       | ushort_;
       
     newLine = eol[[&](unused_type const& unused) { _ast->addNewLine(); }];
-    comment = ';' >> *(char_) >> eol;
+    comment = ';' >> *(char_) >> -(newLine);
   }
   
   simple_string_rule_type comment, symbol, quoted_string;
@@ -205,50 +333,3 @@ Program* AsmParser::parseIt(string data)
   Program* newProgram = new Program();
   phrase_parse(data.begin(), data.end(), DCPU16AssemblyGrammar<string::iterator>(newProgram), space_type(), skip_flag::postskip, newProgram);
 }
-/*
-      program 
-	= program >> line >> '\n'
-	| program >> '\n';
-      
-      line
-	= statement
-	| label
-	| label >> statement;
-      
-      label
-	= ':' << alpha << *(;
-
-      statement
-	= dat
-	| instr;
-      
-      instr
-	= OP2 << operand << ',' << operand
-	| OP1 << operand
-	| error;
-    
-      operand
-	= XREG
-	| gpreg
-	| expr
-	| deref
-	| error;
-      deref
-	= '[' << deref_expr << ']';
-	
-      deref_expr
-	= gpreg
-	| expr
-	| expr << '+' << gpreg
-	| expr << '-' << expr
-	| gpreg << '+' << expr
-	| error;
-	
-      gpreg
-	= GPREG;
-      
-      expr
-	= CONSTANT
-	| SYMBOL;
-  
-      dat*/

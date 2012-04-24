@@ -71,13 +71,13 @@ namespace Parser
   {
     int lineNumber;
     std::string* fileName;
+    boost::optional<boost::variant<Data*, Instruction*, Label*>> contents;
   };
   
   struct Label
   {
     Line* line;
-    Instruction* targetInstruction;
-    Data* targetData;
+    boost::variant<Data*, Instruction*> target;
     boost::optional<uint16_t> computedAddress;
   };
   
@@ -100,6 +100,7 @@ namespace Parser
   
   struct LabelOperand
   {
+    std::string symbolName;
     Label* target;
   };
   
@@ -111,8 +112,9 @@ namespace Parser
   
   struct ExpressionOperand
   {
-    boost::variant<RegisterOperand, LiteralOperand, LabelOperand> first;
-    boost::variant<RegisterOperand, LiteralOperand, LabelOperand> second;
+    typedef boost::variant<RegisterOperand, LiteralOperand, LabelOperand> element_type;
+    element_type first;
+    element_type second;
     ExpressionKind kind;
   };
   
@@ -123,7 +125,8 @@ namespace Parser
     {
       target = RegisterOperand(reg);
     }
-    boost::variant<RegisterOperand, LiteralOperand, LabelOperand, ExpressionOperand> target;
+    typedef boost::variant<RegisterOperand, LiteralOperand, LabelOperand, ExpressionOperand> element_type;
+    element_type target;
   };
   
   struct Data
@@ -138,7 +141,7 @@ namespace Parser
   {
     Opcode opCode;
     Operand first;
-    Operand second;
+    boost::optional<Operand> second;
     boost::optional<uint16_t> computedAddress;
   };
   
