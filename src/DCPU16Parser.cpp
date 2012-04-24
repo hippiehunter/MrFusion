@@ -366,12 +366,26 @@ private:
 };
 
 
-Program* AsmParser::parseIt(string data)
+vector<string> AsmParser::parseIt(const string& data, const string& fileName)
 {
-  Program* newProgram = new Program();
-  phrase_parse(data.begin(), data.end(), DCPU16AssemblyGrammar<string::iterator>(newProgram), space_type(), skip_flag::postskip, newProgram);
+  program->addNewFile(fileName);
+  phrase_parse(data.begin(), data.end(), DCPU16AssemblyGrammar<string::iterator>(program), space_type(), skip_flag::postskip, program);
 }
 
+AsmParser::AsmParser()
+{
+  program = new Program();
+}
+
+AsmParser::~AsmParser()
+{
+  delete program;
+}
+
+Program* AsmParser::ast()
+{
+  return program;
+}
 
 Line* Program::addNewLine()
 {
@@ -424,6 +438,7 @@ void Program::addNewFile(const string& fileName)
   auto fileNamePtr = new string(fileName);
   _lines[fileNamePtr] = vector<Line*>();
   _fileNames.push_back(fileNamePtr);
+  addNewLine();
 }
 
 void Program::addError(const string& message)

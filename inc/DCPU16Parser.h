@@ -19,8 +19,9 @@ namespace Parser
   {
   public:
     ~AsmParser();
-    Program* parseIt(std::string data);
-    
+    AsmParser();
+    std::vector<std::string> parseIt(const std::string& data, const std::string& fileName);
+    Program* ast();
   private:
     Program* program;
   };
@@ -141,6 +142,28 @@ namespace Parser
     boost::optional<uint16_t> computedAddress;
   };
   
+  struct Message
+  {
+    enum Kind
+    {
+      Warning1,
+      Warning2,
+      Warning3,
+      Warning4,
+      Error,
+      SevereError,
+      Info
+    };
+    
+    Kind kind;
+    std::string message;
+    std::string fileName;
+    int filePosStart;
+    int filePosEnd;
+    
+    std::string prettyMessage(Program* program);
+  };
+  
   struct Program
   {
   public:
@@ -153,18 +176,18 @@ namespace Parser
     Label* addLabel(const std::string& labelName);
     Data* addData(std::vector<uint16_t> data);
     Instruction* addInstruction(Opcode op);
-    void addError(const std::string& message);
     
-    void writeSymbols(std::ofstream& file);
-    void writeBinary(std::ofstream& file);
+    void addError(const std::string& message, bool severe);
+    void addWarning(const std::string& message, int level);
+    void addInfo(const std::string& message);
+    
   private:
-    std::vector<boost::variant<Line*, Label*, Data*, Instruction*>> _parsedStream;
     std::vector<std::string*> _fileNames;
     std::map<std::string*, std::vector<Line*>> _lines;
     std::map<std::string, Label*> _labels;
     std::vector<Data*> _dataLiterals;
     std::vector<Instruction*> _instructions;
-    std::vector<std::string> _errors;
+    std::vector<Message*> _errors;
   };
  
 }
