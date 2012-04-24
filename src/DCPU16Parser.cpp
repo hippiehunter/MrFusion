@@ -118,7 +118,7 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
   typedef rule<Iterator, Program*(), space_type> start_rule_type;
   typedef rule<Iterator, Label*(), space_type> label_rule_type;
   typedef rule<Iterator, variant<uint16_t, string>(), space_type> expr_rule_type;
-  typedef rule<Iterator, vector<uint16_t>(), space_type> datlist_rule_type;
+  typedef rule<Iterator, variant<string, vector<uint16_t>>(), space_type> datlist_rule_type;
   typedef rule<Iterator, uint16_t(), space_type> dat_elem_rule_type;
   typedef rule<Iterator, DerefOperand(), space_type> operand_deref_rule_type;
   typedef rule<Iterator, Operand(), space_type> operand_rule_type;
@@ -147,57 +147,18 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
 
   };
   
+  template<typename OP = Operand>
   struct expressionAssign
-      : public boost::static_visitor<Operand>
+      : public boost::static_visitor<OP>
   {
   public:
-    Operand operator()( string & operand ) const
+    OP operator()( string & operand ) const
     {
       return LabelOperand { operand, nullptr};
     }
-    Operand operator()( uint16_t operand ) const
+    OP operator()( uint16_t operand ) const
     {
       return LiteralOperand { operand };
-    }
-  };
-  
-  template<typename Context>
-  struct operandUtil
-  {
-  public:
-    void operator()(Register const& reg, typename Context::context_type& context, qi::unused_type)
-    {
-      boost::fusion::at_c<0>(context.attributes) = RegisterOperand { reg };
-    }
-    void operator()(SpecialOperandType const& spOp, typename Context::context_type& context, qi::unused_type)
-    {
-      boost::fusion::at_c<0>(context.attributes) = SpecialOperand { spOp };
-    }
-    void operator()(DerefOperand const& opr, typename Context::context_type& context, qi::unused_type)
-    {
-      boost::fusion::at_c<0>(context.attributes) = opr;
-    }
-    void operator()(variant<uint16_t, string> const& var, typename Context::context_type& context, qi::unused_type)
-    {
-      struct expressionAssign
-      : public boost::static_visitor<>
-      {
-      public:
-	expressionAssign(Operand& target_) : target(target_) {}
-	  Operand& target;
-	  Operand& operator()( string & operand ) const
-	  {
-	    target = LabelOperand { operand, nullptr};
-	    return target;
-	  }
-	  Operand& operator()( uint16_t operand ) const
-	  {
-	    target = LiteralOperand { operand };
-	    return target;
-	  }
-
-      };
-      boost::apply_visitor(expressionAssign ( boost::fusion::at_c<0>(context.attributes) ), var); 
     }
   };
   
@@ -227,22 +188,6 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
 
   };
   
-  template<typename Context, int pos>
-  struct exprUtil
-  {
-    void operator()(Register reg, typename Context::context_type& context) 
-    {
-      boost::fusion::at_c<0>(context.attributes) = RegisterOperand { reg };
-    }
-    void operator()(variant<uint16_t, string>& var, typename Context::context_type& context) 
-    {
-      ExpressionOperand expResult;
-      boost::apply_visitor(expressionOpAssign<pos>(expResult), var); 
-      boost::fusion::at_c<0>(context.attributes) = DerefOperand { expResult };
-    }
-  };
-  
-  
   DCPU16AssemblyGrammar(Program* ast) : DCPU16AssemblyGrammar::base_type(start)
   {
     auto addLabel = [&](string& name, typename label_rule_type::context_type& context)
@@ -268,9 +213,9 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
 	boost::fusion::at_c<0>(context.attributes)->contents = lbl;
       };
       
-    auto attachOpcode = [](Opcode op, typename instr_rule_type::context_type& context)
+    auto attachOpcode = [&](Opcode op, typename instr_rule_type::context_type& context)
       {
-	boost::fusion::at_c<0>(context.attributes)->opCode = op;
+	boost::fusion::at_c<0>(context.attributes) = ast->addInstruction(op);
       };
       
     auto attachOperand1 = [](Operand& op, typename instr_rule_type::context_type& context)
@@ -283,9 +228,26 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
 	boost::fusion::at_c<0>(context.attributes)->second = op;
       };
       
-    auto attachDatList = [](vector<uint16_t>& raw, typename dat_rule_type::context_type& context)
+    auto attachDatList = [&](variant<string, vector<uint16_t>>& raw, typename dat_rule_type::context_type& context)
       {
-	boost::fusion::at_c<0>(context.attributes)->value = raw; 
+	struct convertToRaw
+	  : public boost::static_visitor<vector<uint16_t>>
+	{
+	public:
+	  vector<uint16_t> operator()( string & operand ) const
+	  {
+	    vector<uint16_t> result;
+	    for(auto ch : operand)
+	      result.push_back(ch);
+	    return result;
+	  }
+	  vector<uint16_t> operator()( vector<uint16_t> operand ) const
+	  {
+	    return operand;
+	  }
+	};
+	auto cleanDat = boost::apply_visitor(convertToRaw(), raw);
+	boost::fusion::at_c<0>(context.attributes) = ast->addData(cleanDat); 
       };
       
     auto operand_makeRegister = [](Register const& reg, typename operand_rule_type::context_type& context)
@@ -302,21 +264,22 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
       };
     auto operand_makeExpr = [](variant<uint16_t, string>& var, typename operand_rule_type::context_type& context)
     {
-      boost::fusion::at_c<0>(context.attributes) = boost::apply_visitor(expressionAssign(), var); 
+      boost::fusion::at_c<0>(context.attributes) = boost::apply_visitor(expressionAssign<Operand>(), var); 
     };
     
     auto opd_makeExpr = [](variant<uint16_t, string>& var, typename operand_deref_rule_type::context_type& context)
     {
-      boost::fusion::at_c<0>(context.attributes) = boost::apply_visitor(expressionAssign(), var); 
+      boost::fusion::at_c<0>(context.attributes).target = 
+	boost::apply_visitor(expressionAssign<typename DerefOperand::element_type>(), var); 
     };
     
     auto opd_makeRegister = [](Register const& reg, typename operand_deref_rule_type::context_type& context)
       {
-	boost::fusion::at_c<0>(context.attributes) = RegisterOperand(reg);
+	boost::fusion::at_c<0>(context.attributes) = DerefOperand { RegisterOperand(reg) };
       };
     auto opd_makeRegister0 = [](Register const& reg, typename operand_deref_rule_type::context_type& context)
       {
-	boost::fusion::at_c<0>(context.attributes) = DerefOperand { ExpressionOperand(reg) };
+	boost::fusion::at_c<0>(context.attributes) = DerefOperand { ExpressionOperand { reg } };
       };
 
     auto opd_makeRegister1 = [](Register const& reg, typename operand_deref_rule_type::context_type& context)
@@ -407,4 +370,68 @@ Program* AsmParser::parseIt(string data)
 {
   Program* newProgram = new Program();
   phrase_parse(data.begin(), data.end(), DCPU16AssemblyGrammar<string::iterator>(newProgram), space_type(), skip_flag::postskip, newProgram);
+}
+
+
+Line* Program::addNewLine()
+{
+  auto newLine = new Line();
+  newLine->fileName = currentFileName();
+  newLine->lineNumber = _lines.size();
+  _lines[newLine->fileName].push_back(newLine);
+  return newLine;
+}
+
+Label* Program::addLabel(const std::string& labelName)
+{
+  if(_labels.find(labelName) != _labels.end())
+    addError("duplicate label declared");
+  
+  auto newLabel = new Label();
+  newLabel->name = labelName;
+  newLabel->line = currentLine();
+  _labels[labelName] = newLabel;
+  return newLabel;
+}
+Data* Program::addData(std::vector<uint16_t> data)
+{
+  auto newData = new Data();
+  newData->value = data;
+  _dataLiterals.push_back(newData);
+  return newData;
+}
+
+Instruction* Program::addInstruction(Opcode op)
+{
+  auto newInstruction = new Instruction();
+  newInstruction->opCode = op;
+  _instructions.push_back(newInstruction);
+  return newInstruction;
+}
+
+string* Program::currentFileName()
+{
+  return _fileNames.back();
+}
+
+Line* Program::currentLine()
+{
+  return _lines[currentFileName()].back();
+}
+
+void Program::addNewFile(const string& fileName)
+{
+  auto fileNamePtr = new string(fileName);
+  _lines[fileNamePtr] = vector<Line*>();
+  _fileNames.push_back(fileNamePtr);
+}
+
+void Program::addError(const string& message)
+{
+  _errors.push_back(message);
+}
+
+Program::~Program()
+{
+  
 }

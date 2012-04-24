@@ -77,6 +77,7 @@ namespace Parser
   struct Label
   {
     Line* line;
+    std::string name;
     boost::variant<Data*, Instruction*> target;
     boost::optional<uint16_t> computedAddress;
   };
@@ -120,11 +121,6 @@ namespace Parser
   
   struct DerefOperand
   {
-    DerefOperand() {}
-    DerefOperand(Register reg)
-    {
-      target = RegisterOperand(reg);
-    }
     typedef boost::variant<RegisterOperand, LiteralOperand, LabelOperand, ExpressionOperand> element_type;
     element_type target;
   };
@@ -149,16 +145,14 @@ namespace Parser
   {
   public:
     ~Program();
-    
     Line* currentLine();
     std::string* currentFileName();
     
+    void addNewFile(const std::string& fileName);
     Line* addNewLine();
     Label* addLabel(const std::string& labelName);
     Data* addData(std::vector<uint16_t> data);
-    Data* addData(std::string data);
-    Instruction* addInstruction(Opcode op, Operand& opr1);
-    Instruction* addInstruction(Opcode op, Operand& opr1, Operand& opr2);
+    Instruction* addInstruction(Opcode op);
     void addError(const std::string& message);
     
     void writeSymbols(std::ofstream& file);
@@ -166,10 +160,11 @@ namespace Parser
   private:
     std::vector<boost::variant<Line*, Label*, Data*, Instruction*>> _parsedStream;
     std::vector<std::string*> _fileNames;
-    std::vector<Line*> _lines;
+    std::map<std::string*, std::vector<Line*>> _lines;
     std::map<std::string, Label*> _labels;
     std::vector<Data*> _dataLiterals;
     std::vector<Instruction*> _instructions;
+    std::vector<std::string> _errors;
   };
  
 }
