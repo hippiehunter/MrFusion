@@ -16,6 +16,7 @@ using MrFusion::IFileFactory;
 class SimpleFile : public IFile
 {
 public:
+  virtual ~SimpleFile() {}
   SimpleFile(const std::string& fileName,
 	     shared_ptr<string> contents)
   {
@@ -38,12 +39,12 @@ public:
     }
   }
   
-  const string& fileName()
+  virtual const string& fileName()
   {
     return _fileName;
   }
   
-  tuple<int, int> lineAndColumnFromPos(int position)
+  virtual tuple<int, int> lineAndColumnFromPos(int position)
   {
     //find the line index so we can get its start
     auto lineNumber = binarySearchForLineRange(0, _lineEnds.size() - 1, position);
@@ -53,7 +54,13 @@ public:
     return tuple<int,int>(lineNumber, column);
   }
   
-  shared_ptr<string> contents()
+  virtual int posFromLineAndColumn(int line, int column)
+  {
+    auto lineStart = (line == 0) ? 0 : (_lineEnds.at(line - 1) + 1);
+    return lineStart + column;
+  }
+  
+  virtual shared_ptr<string> contents()
   {
     return _contents;
   }

@@ -11,9 +11,11 @@ namespace MrFusion
   class IFile
   {
   public:
-    const std::string& fileName() = 0;
-    std::tuple<int, int> lineAndColumnFromPos(int position) = 0;
-    std::tr1::shared_ptr<std::string> contents() = 0;
+    virtual ~IFile() = 0;
+    virtual const std::string& fileName() = 0;
+    virtual std::tuple<int, int> lineAndColumnFromPos(int position) = 0;
+    virtual int posFromLineAndColumn(int line, int column) = 0;
+    virtual std::tr1::shared_ptr<std::string> contents() = 0;
   };
   
   class IFileFactory
