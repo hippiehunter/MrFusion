@@ -169,6 +169,7 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
       : public boost::static_visitor<>
       {
       public:
+	expressionAssign(Operand& target_) : target(target_) {}
 	  Operand& target;
 	  void operator()( string & operand ) const
 	  {
@@ -180,7 +181,7 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
 	  }
 
       };
-      boost::apply_visitor(expressionAssign { boost::fusion::at_c<0>(context.attributes) }, var); 
+      boost::apply_visitor(expressionAssign ( boost::fusion::at_c<0>(context.attributes) ), var); 
     }
   };
   
@@ -265,6 +266,39 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
       {
 	boost::fusion::at_c<0>(context.attributes)->value = raw; 
       };
+      
+    auto operand_makeRegister = [](Register reg, typename operand_rule_type::context_type& context, qi::unused_type)
+      {
+	boost::fusion::at_c<0>(context.attributes) = RegisterOperand(reg);
+      };
+    auto operand_makeSpecialOp = [](SpecialOperandType spOp, typename operand_rule_type::context_type& context, qi::unused_type)
+      {
+	boost::fusion::at_c<0>(context.attributes) = SpecialOperand { spOp };
+      };
+    auto operand_makeDerefOp = [](DerefOperand& opr, typename operand_rule_type::context_type& context, qi::unused_type)
+      {
+	boost::fusion::at_c<0>(context.attributes) = opr;
+      };
+    auto operand_makeExpr = [](variant<uint16_t, string>& var, typename operand_rule_type::context_type& context, qi::unused_type)
+    {
+      struct expressionAssign
+      : public boost::static_visitor<>
+      {
+      public:
+	expressionAssign(Operand& target_) : target(target_) {}
+	  Operand& target;
+	  void operator()( string & operand ) const
+	  {
+	      target = LabelOperand { operand, nullptr};
+	  }
+	  void operator()( uint16_t operand ) const
+	  {
+	    target = LiteralOperand { operand };
+	  }
+
+      };
+      boost::apply_visitor(expressionAssign ( boost::fusion::at_c<0>(context.attributes) ), var); 
+    };
     
     _ast = ast;
     start = *(line[[](unused_type) {}]);
@@ -282,10 +316,10 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
     instr = no_case[binaryOpcodes[attachOpcode]] > operand[attachOperand1] > ',' > operand[attachOperand2]
       | no_case[unaryOpcodes[attachOpcode]] > operand[attachOperand1];
       
-    operand = no_case[specialOperands[operandUtil<operand_rule_type>()]]
-      | no_case[gpRegisters[operandUtil<operand_rule_type>()]]
-      | expr[operandUtil<operand_rule_type>()]
-      | operand_deref[operandUtil<operand_rule_type>()];
+    operand = no_case[specialOperands[operand_makeSpecialOp]]
+      | no_case[gpRegisters[operand_makeRegister]]
+      | expr[operand_makeExpr]
+      | operand_deref[operand_makeDerefOp];
       
     //operand_deref = lit('[') >> no_case[gpRegisters[operandUtil<operand_deref_rule_type>()]] >> ']'
     //  | lit('[') >> expr[operandUtil<operand_rule_type>()] >> ']'
