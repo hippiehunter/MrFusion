@@ -147,23 +147,37 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
 
   };
   
+  struct expressionAssign
+      : public boost::static_visitor<Operand>
+  {
+  public:
+    Operand operator()( string & operand ) const
+    {
+      return LabelOperand { operand, nullptr};
+    }
+    Operand operator()( uint16_t operand ) const
+    {
+      return LiteralOperand { operand };
+    }
+  };
+  
   template<typename Context>
   struct operandUtil
   {
   public:
-    void operator()(Register reg, typename Context::context_type& context, qi::unused_type)
+    void operator()(Register const& reg, typename Context::context_type& context, qi::unused_type)
     {
-      boost::fusion::at_c<0>(context.attributes) = RegisterOperand(reg);
+      boost::fusion::at_c<0>(context.attributes) = RegisterOperand { reg };
     }
-    void operator()(SpecialOperandType spOp, typename Context::context_type& context, qi::unused_type)
+    void operator()(SpecialOperandType const& spOp, typename Context::context_type& context, qi::unused_type)
     {
       boost::fusion::at_c<0>(context.attributes) = SpecialOperand { spOp };
     }
-    void operator()(DerefOperand& opr, typename Context::context_type& context, qi::unused_type)
+    void operator()(DerefOperand const& opr, typename Context::context_type& context, qi::unused_type)
     {
       boost::fusion::at_c<0>(context.attributes) = opr;
     }
-    void operator()(variant<uint16_t, string>& var, typename Context::context_type& context, qi::unused_type)
+    void operator()(variant<uint16_t, string> const& var, typename Context::context_type& context, qi::unused_type)
     {
       struct expressionAssign
       : public boost::static_visitor<>
@@ -171,13 +185,15 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
       public:
 	expressionAssign(Operand& target_) : target(target_) {}
 	  Operand& target;
-	  void operator()( string & operand ) const
+	  Operand& operator()( string & operand ) const
 	  {
-	      target = LabelOperand { operand, nullptr};
+	    target = LabelOperand { operand, nullptr};
+	    return target;
 	  }
-	  void operator()( uint16_t operand ) const
+	  Operand& operator()( uint16_t operand ) const
 	  {
 	    target = LiteralOperand { operand };
+	    return target;
 	  }
 
       };
@@ -185,38 +201,43 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
     }
   };
   
+  template<int pos>
+  struct expressionOpAssign
+    : public boost::static_visitor<ExpressionOperand&>
+  {
+  public:
+    expressionOpAssign(ExpressionOperand& target_) : target(target_) {}
+    ExpressionOperand& target;
+    ExpressionOperand& operator()( string & operand ) const
+    {
+      if(pos == 0)
+	target.first = LabelOperand { operand, nullptr};
+      else
+	target.second = LabelOperand { operand, nullptr};
+      return target;
+    }
+    ExpressionOperand& operator()( uint16_t operand ) const
+    {
+	if(pos == 0)
+	  target.first = LiteralOperand { operand };
+	else
+	  target.second = LiteralOperand { operand };
+	return target;
+    }
+
+  };
+  
   template<typename Context, int pos>
   struct exprUtil
   {
-    void operator()(Register reg, typename Context::context_type& context, unused_type&)
+    void operator()(Register reg, typename Context::context_type& context) 
     {
       boost::fusion::at_c<0>(context.attributes) = RegisterOperand { reg };
     }
-    void operator()(variant<uint16_t, string> var, typename Context::context_type& context, unused_type&)
+    void operator()(variant<uint16_t, string>& var, typename Context::context_type& context) 
     {
-      struct expressionAssign
-      : public boost::static_visitor<>
-      {
-      public:
-	  ExpressionOperand& target;
-	  void operator()( string & operand ) const
-	  {
-	    if(pos == 0)
-	      target.first = LabelOperand { operand, nullptr};
-	    else
-	      target.second = LabelOperand { operand, nullptr};
-	  }
-	  void operator()( uint16_t operand ) const
-	  {
-	      if(pos == 0)
-		target.first = LiteralOperand { operand };
-	      else
-		target.second = LiteralOperand { operand };
-	  }
-
-      };
       ExpressionOperand expResult;
-      boost::apply_visitor(expressionAssign { expResult }, var); 
+      boost::apply_visitor(expressionOpAssign<pos>(expResult), var); 
       boost::fusion::at_c<0>(context.attributes) = DerefOperand { expResult };
     }
   };
@@ -267,38 +288,58 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
 	boost::fusion::at_c<0>(context.attributes)->value = raw; 
       };
       
-    auto operand_makeRegister = [](Register reg, typename operand_rule_type::context_type& context, qi::unused_type)
+    auto operand_makeRegister = [](Register const& reg, typename operand_rule_type::context_type& context)
       {
 	boost::fusion::at_c<0>(context.attributes) = RegisterOperand(reg);
       };
-    auto operand_makeSpecialOp = [](SpecialOperandType spOp, typename operand_rule_type::context_type& context, qi::unused_type)
+    auto operand_makeSpecialOp = [](SpecialOperandType const& spOp, typename operand_rule_type::context_type& context)
       {
 	boost::fusion::at_c<0>(context.attributes) = SpecialOperand { spOp };
       };
-    auto operand_makeDerefOp = [](DerefOperand& opr, typename operand_rule_type::context_type& context, qi::unused_type)
+    auto operand_makeDerefOp = [](DerefOperand const& opr, typename operand_rule_type::context_type& context)
       {
 	boost::fusion::at_c<0>(context.attributes) = opr;
       };
-    auto operand_makeExpr = [](variant<uint16_t, string>& var, typename operand_rule_type::context_type& context, qi::unused_type)
+    auto operand_makeExpr = [](variant<uint16_t, string>& var, typename operand_rule_type::context_type& context)
     {
-      struct expressionAssign
-      : public boost::static_visitor<>
-      {
-      public:
-	expressionAssign(Operand& target_) : target(target_) {}
-	  Operand& target;
-	  void operator()( string & operand ) const
-	  {
-	      target = LabelOperand { operand, nullptr};
-	  }
-	  void operator()( uint16_t operand ) const
-	  {
-	    target = LiteralOperand { operand };
-	  }
-
-      };
-      boost::apply_visitor(expressionAssign ( boost::fusion::at_c<0>(context.attributes) ), var); 
+      boost::fusion::at_c<0>(context.attributes) = boost::apply_visitor(expressionAssign(), var); 
     };
+    
+    auto opd_makeExpr = [](variant<uint16_t, string>& var, typename operand_deref_rule_type::context_type& context)
+    {
+      boost::fusion::at_c<0>(context.attributes) = boost::apply_visitor(expressionAssign(), var); 
+    };
+    
+    auto opd_makeRegister = [](Register const& reg, typename operand_deref_rule_type::context_type& context)
+      {
+	boost::fusion::at_c<0>(context.attributes) = RegisterOperand(reg);
+      };
+    auto opd_makeRegister0 = [](Register const& reg, typename operand_deref_rule_type::context_type& context)
+      {
+	boost::fusion::at_c<0>(context.attributes) = DerefOperand { ExpressionOperand(reg) };
+      };
+
+    auto opd_makeRegister1 = [](Register const& reg, typename operand_deref_rule_type::context_type& context)
+      {
+	auto derefOpr = boost::get<DerefOperand>(boost::fusion::at_c<0>(context.attributes));
+	auto expResult = boost::get<ExpressionOperand>(derefOpr.target);
+	expResult.second = RegisterOperand(reg);
+      };
+
+    auto opd_makeExpr0 = [](variant<uint16_t, string>& var, typename operand_deref_rule_type::context_type& context) 
+      {
+	ExpressionOperand expResult;
+	boost::apply_visitor(expressionOpAssign<0>(expResult), var); 
+	boost::fusion::at_c<0>(context.attributes) = DerefOperand { expResult };
+      };
+      
+    auto opd_makeExpr1 = [](variant<uint16_t, string>& var, typename operand_deref_rule_type::context_type& context) 
+      {
+	auto derefOpr = boost::get<DerefOperand>(boost::fusion::at_c<0>(context.attributes));
+	auto expResult = boost::get<ExpressionOperand>(derefOpr.target);
+	
+	boost::apply_visitor(expressionOpAssign<1>(expResult), var); 
+      };
     
     _ast = ast;
     start = *(line[[](unused_type) {}]);
@@ -321,10 +362,10 @@ struct DCPU16AssemblyGrammar : grammar<Iterator, Program*(), space_type>
       | expr[operand_makeExpr]
       | operand_deref[operand_makeDerefOp];
       
-    //operand_deref = lit('[') >> no_case[gpRegisters[operandUtil<operand_deref_rule_type>()]] >> ']'
-    //  | lit('[') >> expr[operandUtil<operand_rule_type>()] >> ']'
-    //  | lit('[') >> expr[exprUtil<operand_rule_type, 0>()] >> '+' >> no_case[gpRegisters[exprUtil<operand_rule_type, 1>()]] >> ']'
-    //  | lit('[') >> no_case[gpRegisters[exprUtil<operand_rule_type, 0>()]] >> '+' >> expr[exprUtil<operand_rule_type, 1>()] >> ']';
+    operand_deref = lit('[') >> no_case[gpRegisters[opd_makeRegister]] >> ']'
+      | lit('[') >> expr[opd_makeExpr] >> ']'
+      | lit('[') >> expr[opd_makeExpr0] >> '+' >> no_case[gpRegisters[opd_makeRegister1]] >> ']'
+      | lit('[') >> no_case[gpRegisters[opd_makeRegister0]] >> '+' >> expr[opd_makeExpr1] >> ']';
       
     symbol %= alpha >> *(alnum);
     
