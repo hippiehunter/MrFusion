@@ -1,6 +1,15 @@
 #ifndef MRFUSION_AST
 #define MRFUSION_AST
 
+#include <tr1/shared_ptr.h>
+#include <vector>
+#include <string>
+#include <algorithm>
+
+#include <boost/variant.hpp>
+#include <boost/optional.hpp>
+#include <boost/pool/object_pool.hpp>
+
 class IFile;
 
 namespace MrFusion
@@ -119,6 +128,24 @@ namespace MrFusion
       Operand first;
       boost::optional<Operand> second;
       boost::optional<uint16_t> computedAddress;
+    };
+    
+    class GlobalContext
+    {
+    public:
+      template<typename F>
+      void processLines(F& f)
+      {
+	std::for_each(_lines.begin(), _lines.end(), f);
+      }
+    private:
+      std::vector<std::tr1::shared_ptr<IFile>> _files;
+      std::vector<Line*> _lines;
+      
+      boost::object_pool<Line> _linePool;
+      boost::object_pool<Instruction> _instructionPool;
+      boost::object_pool<Data> _dataPool;
+      boost::object_pool<Label> _labelPool;
     };
   }
 }
