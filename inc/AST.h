@@ -20,8 +20,11 @@ namespace MrFusion
     {
       POP,
       PEEK,
-      PUSH
+      PUSH,
+      SPECIAL_OPERAND_COUNT
     };
+    
+    std::map<SpecialOperandType, const char*> specialOperandTypeNames;
     
     enum Register
     {
@@ -39,6 +42,8 @@ namespace MrFusion
       REGISTER_COUNT
     };
     
+    std::map<Register, const char*> registerNames;
+    
     enum Opcode {
       SET,
       ADD,
@@ -55,13 +60,16 @@ namespace MrFusion
       IFN,
       IFG,
       IFB,
-      JSR
+      JSR,
+      OPCODE_COUNT
     };
+    
+    bstd::map<Opcode, const char*> opcodeNames;
 
     struct Line
     {
       int lineNumber;
-      IFile* fileName;
+      boost::weak_ptr<IFile> file;
       boost::optional<boost::variant<Data*, Instruction*, Label*>> contents;
     };
     
@@ -69,7 +77,7 @@ namespace MrFusion
     {
       Line* line;
       std::string name;
-      boost::variant<Data*, Instruction*> target;
+      boost::optional<boost::variant<Data*, Instruction*>> target;
       boost::optional<uint16_t> computedAddress;
     };
     
@@ -99,6 +107,8 @@ namespace MrFusion
       Plus,
       Minus
     };
+    
+    std::map<ExpressionKind, const char*> expressionKindNames;
     
     struct ExpressionOperand
     {
