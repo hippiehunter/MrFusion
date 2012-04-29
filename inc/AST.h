@@ -1,6 +1,8 @@
 #ifndef MRFUSION_AST
 #define MRFUSION_AST
 
+#include "ErrorReporting.h"
+
 #include <tr1/shared_ptr.h>
 #include <vector>
 #include <string>
@@ -148,6 +150,14 @@ namespace MrFusion
       {
 	std::for_each(_lines.begin(), _lines.end(), f);
       }
+      
+      Line* makeLine(std::tr1::shared_ptr<IFile> file, int lineNumber);
+      Line* makeLine(std::tr1::shared_ptr<IFile> file, int lineNumber, boost::variant<Data*, Instruction*, Label*> contents);
+      Instruction* makeInstruction(Opcode opCode, Operand first);
+      Instruction* makeInstruction(Opcode opCode, Operand first, Operand second);
+      Data* makeData(std::vector<uint16_t> data);
+      Label* makeLabel(std::string name);
+      std:tr1::shared_ptr<ErrorReporting> errorReporting();
     private:
       std::vector<std::tr1::shared_ptr<IFile>> _files;
       std::vector<Line*> _lines;
