@@ -2,7 +2,8 @@
 
 using MrFusion::Ast::Opcode;
 using MrFusion::Ast::Register;
-using MrFusion::Ast::SpecialOperand;
+using MrFusion::Ast::SpecialOperandType;
+using MrFusion::Ast::ExpressionKind;
 
 using std::map;
 
@@ -37,11 +38,11 @@ map<Register, const char*> MrFusion::Ast::registerNames = {
   {Register::SP, "SP" },
   {Register::OF, "OF" }};
   
-map<SpecialOperand, const char*> MrFusion::Ast::specialOperandTypeNames = {
-  {SpecialOperand::PEEK, "PEEK" },
-  {SpecialOperand::POP, "POP" },
-  {SpecialOperand::PUSH, "PUSH" }};
+map<SpecialOperandType, const char*> MrFusion::Ast::specialOperandTypeNames = {
+  {SpecialOperandType::PEEK, "PEEK" },
+  {SpecialOperandType::POP, "POP" },
+  {SpecialOperandType::PUSH, "PUSH" }};
   
-map<ExpressionKind, const char*> MrFusion::Ast::expressionKindName = {
+map<ExpressionKind, const char*> MrFusion::Ast::expressionKindNames = {
   {ExpressionKind::Plus, "+" },
   {ExpressionKind::Minus, "-" }};

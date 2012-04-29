@@ -6,6 +6,8 @@
 using std::string;
 using std::ifstream;
 
+using MrFusion::AsmParser;
+
 int main(int argc, char **argv) {
     string str;
     

@@ -2,12 +2,14 @@
 
 #include <string>
 #include <vector>
-#include <tr1/shared_ptr.h>
+#include <tr1/memory>
 #include <fstream>
+#include <tuple>
 
 using std::tr1::shared_ptr;
 using std::string;
 using std::vector;
+using std::tuple;
 using std::ifstream;
 using MrFusion::IFile;
 using MrFusion::IFileFactory;
@@ -94,15 +96,17 @@ private:
 shared_ptr<IFile> IFileFactory::makeFile(const string& fileName)
 {
   ifstream file;
-  file.open(str);
+  file.open(fileName);
   shared_ptr<string> contents(new string());
-  (*contents) << file;
+  file >> (*contents);
   return IFileFactory::makeFile(fileName, contents);
 }
 
 shared_ptr<IFile> IFileFactory::makeFile(const string& fileName,
-					 shared_ptr<string> contents)
+					 shared_ptr<string>& contents)
 {
   return shared_ptr<IFile>(new SimpleFile(fileName, contents));
 }
+
+IFile::~IFile() { }
 

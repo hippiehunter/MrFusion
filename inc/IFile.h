@@ -3,7 +3,7 @@
 
 #include <tuple>
 #include <string>
-#include <tr1/shared_ptr.h>
+#include <tr1/memory>
 
 
 namespace MrFusion

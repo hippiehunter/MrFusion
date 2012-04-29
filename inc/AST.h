@@ -2,8 +2,9 @@
 #define MRFUSION_AST
 
 #include "ErrorReporting.h"
+#include "IFile.h"
 
-#include <tr1/shared_ptr.h>
+#include <tr1/memory>
 #include <vector>
 #include <string>
 #include <algorithm>
@@ -12,12 +13,16 @@
 #include <boost/optional.hpp>
 #include <boost/pool/object_pool.hpp>
 
-class IFile;
 
 namespace MrFusion
 {
   namespace Ast
   {
+    struct Data;
+    struct Line;
+    struct Instruction;
+    struct Label;
+    
     enum SpecialOperandType
     {
       POP,
@@ -26,7 +31,7 @@ namespace MrFusion
       SPECIAL_OPERAND_COUNT
     };
     
-    std::map<SpecialOperandType, const char*> specialOperandTypeNames;
+    extern std::map<SpecialOperandType, const char*> specialOperandTypeNames;
     
     enum Register
     {
@@ -44,7 +49,7 @@ namespace MrFusion
       REGISTER_COUNT
     };
     
-    std::map<Register, const char*> registerNames;
+    extern std::map<Register, const char*> registerNames;
     
     enum Opcode {
       SET,
@@ -66,12 +71,12 @@ namespace MrFusion
       OPCODE_COUNT
     };
     
-    bstd::map<Opcode, const char*> opcodeNames;
-
+    extern std::map<Opcode, const char*> opcodeNames;
+    
     struct Line
     {
       int lineNumber;
-      boost::weak_ptr<IFile> file;
+      std::tr1::weak_ptr<MrFusion::IFile> file;
       boost::optional<boost::variant<Data*, Instruction*, Label*>> contents;
     };
     
@@ -110,7 +115,7 @@ namespace MrFusion
       Minus
     };
     
-    std::map<ExpressionKind, const char*> expressionKindNames;
+    extern std::map<ExpressionKind, const char*> expressionKindNames;
     
     struct ExpressionOperand
     {
@@ -151,15 +156,15 @@ namespace MrFusion
 	std::for_each(_lines.begin(), _lines.end(), f);
       }
       
-      Line* makeLine(std::tr1::shared_ptr<IFile> file, int lineNumber);
-      Line* makeLine(std::tr1::shared_ptr<IFile> file, int lineNumber, boost::variant<Data*, Instruction*, Label*> contents);
+      Line* makeLine(std::tr1::shared_ptr<MrFusion::IFile>& file, int lineNumber);
+      Line* makeLine(std::tr1::shared_ptr<MrFusion::IFile>& file, int lineNumber, boost::variant<Data*, Instruction*, Label*> contents);
       Instruction* makeInstruction(Opcode opCode, Operand first);
       Instruction* makeInstruction(Opcode opCode, Operand first, Operand second);
       Data* makeData(std::vector<uint16_t> data);
       Label* makeLabel(std::string name);
-      std:tr1::shared_ptr<ErrorReporting> errorReporting();
+      std::tr1::shared_ptr<MrFusion::ErrorReporting> errorReporting();
     private:
-      std::vector<std::tr1::shared_ptr<IFile>> _files;
+      std::vector<std::tr1::shared_ptr<MrFusion::IFile>> _files;
       std::vector<Line*> _lines;
       
       boost::object_pool<Line> _linePool;

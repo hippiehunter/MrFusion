@@ -10,9 +10,9 @@ namespace MrFusion
     ~AsmParser();
     AsmParser();
     std::vector<std::string> parseIt(const std::string& data, const std::string& fileName);
-    Program* ast();
+    MrFusion::Ast::GlobalContext* context();
   private:
-    Program* program;
+    MrFusion::Ast::GlobalContext* _context;
   };
 }
 

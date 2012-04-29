@@ -1,15 +1,26 @@
 #include "Parser.h"
 #include "AST.h"
+#include "IFile.h"
+
+#include <vector>
+#include <string>
 
 #include <boost/spirit/include/qi.hpp>
 
 using namespace MrFusion::Ast;
+using MrFusion::IFileFactory;
+using MrFusion::IFile;
+using MrFusion::AsmParser;
 
 using boost::spirit::qi::symbols;
 using boost::spirit::qi::grammar;
 using boost::spirit::qi::rule;
 using boost::spirit::qi::space_type;
+using boost::spirit::qi::skip_flag;
 using boost::spirit::unused_type;
+
+using std::vector;
+using std::string;
 
 namespace
 {
@@ -105,4 +116,19 @@ namespace
     {
     }
   };
+}
+
+AsmParser::~AsmParser()
+{
+}
+
+AsmParser::AsmParser()
+{
+  
+}
+
+vector<string> AsmParser::parseIt(const string& data, const string& fileName)
+{
+  auto file = IFileFactory::makeFile(fileName);
+  phrase_parse(file->contents()->begin(), file->contents()->end(), DCPU16AssemblyGrammar<string::iterator>(_context), space_type(), skip_flag::postskip);
 }

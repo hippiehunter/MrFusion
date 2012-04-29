@@ -3,7 +3,7 @@
 #include<iomanip>
 #include <boost/variant.hpp>
 
-using MrFusion::Processors::PrettyPrint;
+using MrFusion::Processors::PrettyPrinter;
 using namespace MrFusion::Ast;
 
 using std::tr1::shared_ptr;
@@ -18,7 +18,7 @@ using boost::static_visitor;
 
 namespace
 {
-  class ProcOperand : static_visitor<void>
+  class ProcOperand : public static_visitor<void>
   {
   private:
     ostream& _output;
@@ -26,7 +26,7 @@ namespace
     std::string _preIndentation;
     
   public:
-    ProcOperand(ostream& output, int indentation) : _output(), _indentation(indentation) 
+    ProcOperand(ostream& output, int indentation) : _output(output), _indentation(indentation) 
     {
       _preIndentation = string('\t', _indentation);
     }
@@ -35,7 +35,8 @@ namespace
     {
       _output << _preIndentation << "found deref operand:" << endl;
       
-      apply_visitor(ProcOperand(_output, _indentation + 1), op.target);
+      ProcOperand proc(_output, _indentation + 1);
+      apply_visitor(proc, op.target);
     }
     
     void operator()(ExpressionOperand& op)
@@ -43,17 +44,18 @@ namespace
       _output << _preIndentation << "found expression operand:" << endl
 		<< _preIndentation << "first operand:" << endl;
 		
-      apply_visitor(ProcOperand(_output, _indentation + 1), op.first);
+      ProcOperand proc(_output, _indentation + 1);
+      apply_visitor(proc, op.first);
       
       _output << _preIndentation << "expression operator:" << expressionKindNames[op.kind] << endl;
       
-      apply_visitor(ProcOperand(_output, _indentation + 1), op.second);
+      apply_visitor(proc, op.second);
     }
     
     void operator()(LabelOperand& op)
     {
       _output << _preIndentation << "found label operand:" << endl
-	      << _preIndentation << "\symbol name:" << op.symbolName << endl;
+	      << _preIndentation << "\tsymbol name:" << op.symbolName << endl;
     }
     
     void operator()(LiteralOperand& op)
@@ -75,14 +77,14 @@ namespace
     }
   };
 
-  class ProcLineContents : static_visitor<void>
+  class ProcLineContents : public static_visitor<void>
   {
   private:
     ostream& _output;
   public:
     ProcLineContents(ostream& output) : _output(output) {}
     
-    void operator()(Data* data)
+    void operator()(Data*& data)
     {
       _output << "found data:" << endl
 	      << "\tlength:" << data->value.size()
@@ -97,26 +99,28 @@ namespace
       _output << dec << endl;
     }
     
-    void operator()(Instruction* instruction)
+    void operator()(Instruction*& instruction)
     {
       _output << "found instruction:" << endl
 	      << "\topcode:" << opcodeNames[instruction->opCode] << endl;
 
-      apply_visitor(ProcOperand, instruction->first);
+      ProcOperand proc(_output, 1);
+      apply_visitor(proc, instruction->first);
 	    
       if(instruction->second)
       {
-	apply_visitor(ProcOperand, instruction->second.get());
+	apply_visitor(proc, instruction->second.get());
       }
     }
     
-    void operator()(Label* label)
+    void operator()(Label*& label)
     {
       _output << "found label:" << endl
-	      << "\tname:" << label->name < endl;
+	      << "\tname:" << label->name << endl;
       if(label->target)
       {
-	apply_visitor(this, label->target.get());
+	ProcLineContents proc(_output);
+	apply_visitor(proc, label->target.get());
       }
     }
   };
@@ -124,11 +128,11 @@ namespace
 
 void PrettyPrinter::operator()(Line* line)
 {
-  if(line->file != _currentFile)
+  if(line->file.lock() != _currentFile.lock())
   {
     _currentFile = line->file;
     _output << "file:"
-	    << _currentFile->fileName
+	    << _currentFile.lock()->fileName()
 	    << endl;
   }
   
@@ -140,6 +144,7 @@ void PrettyPrinter::operator()(Line* line)
   //this is to check if we had a blank line
   if(line->contents)
   {
-    apply_visitor(ProcLineContents(_output), line->contents.get());
+    auto tmp = ProcLineContents(_output);
+    apply_visitor(tmp, line->contents.get());
   }
 }

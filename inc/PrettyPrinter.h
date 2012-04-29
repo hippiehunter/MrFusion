@@ -2,7 +2,7 @@
 #define MRFUSION_PROCESSORS_PRETY_PRINT_H
 #include "AST.h"
 
-#include <tr1/shared_ptr.h>
+#include <tr1/memory>
 #include <iostream>
 
 namespace MrFusion
@@ -12,10 +12,10 @@ namespace MrFusion
     class PrettyPrinter
     {
     public:
-      void operator()(Line* line);
+      void operator()(MrFusion::Ast::Line* line);
     private:
       std::ostream& _output;
-      std::tr1::share_ptr<IFile> _currentFile;
+      std::tr1::weak_ptr<MrFusion::IFile> _currentFile;
     };
   }
 }
