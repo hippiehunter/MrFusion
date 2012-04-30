@@ -1,16 +1,21 @@
 #include "Parser.h"
 #include "AST.h"
 #include "IFile.h"
+#include "ParserUtils.h"
 
 #include <vector>
 #include <string>
 
 #include <boost/spirit/include/qi.hpp>
+#include <boost/variant.hpp>
 
 using namespace MrFusion::Ast;
 using MrFusion::IFileFactory;
 using MrFusion::IFile;
 using MrFusion::AsmParser;
+using MrFusion::ParserUtils::attach_statement_impl;
+using MrFusion::ParserUtils::make_line_empty_impl;
+using MrFusion::ParserUtils::make_line_impl;
 
 using boost::spirit::qi::symbols;
 using boost::spirit::qi::grammar;
@@ -18,6 +23,10 @@ using boost::spirit::qi::rule;
 using boost::spirit::qi::space_type;
 using boost::spirit::qi::skip_flag;
 using boost::spirit::unused_type;
+using boost::variant;
+
+namespace qi = boost::spirit::qi;
+namespace phx = boost::phoenix;
 
 using std::vector;
 using std::string;
@@ -109,11 +118,43 @@ namespace
   {
   private:
     rule<Iterator, unused_type, space_type> start;
-  
+    rule<Iterator, Label*(), space_type> label;
+    rule<Iterator, variant<uint16_t, string>(), space_type> expr;
+    rule<Iterator, variant<string, vector<uint16_t>>(), space_type> datlist;
+    rule<Iterator, uint16_t(), space_type> dat_elem;
+    rule<Iterator, DerefOperand(), space_type> operand_deref;
+    rule<Iterator, Operand(), space_type> operand;
+    rule<Iterator, Instruction*(), space_type> instr;
+    rule<Iterator, Data*(), space_type> dat;
+    rule<Iterator, Line*(), qi::locals<Label*>, space_type> line;
+    rule<Iterator, variant<Data*, Instruction*>(), space_type> statement;
+    rule<Iterator, unused_type, space_type> newLine;
+    rule<Iterator, string(), space_type> comment, symbol, quoted_string;
   public:
-    DCPU16AssemblyGrammar(GlobalContext* globalContext)
+    DCPU16AssemblyGrammar(GlobalContext* c)
       : DCPU16AssemblyGrammar::base_type(start)
     {
+      make_line_empty_impl mlei(c);
+      make_line_impl mli(c);
+      
+      phx::function<make_line_empty_impl> make_line_empty(mlei);
+      phx::function<make_line_impl> make_line(mli);
+      phx::function<attach_statement_impl> attach_statement;
+      
+      start = *(line);
+      
+      line = newLine[qi::_val = make_line_empty()]
+      | comment[qi::_val = make_line_empty()]
+      
+      | statement[qi::_val = make_line(qi::_1)] >> 
+	-(comment) >> -(newLine)
+	
+      | label[qi::_a = qi::_1] >> 
+	statement[qi::_val = make_line(attach_statement(qi::_a, qi::_1))] >>
+	-(comment) >> -(newLine)
+	
+      | label[qi::_val = make_line(qi::_1)] >> 
+	-(newLine);
     }
   };
 }

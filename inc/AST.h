@@ -155,9 +155,10 @@ namespace MrFusion
       {
 	std::for_each(_lines.begin(), _lines.end(), f);
       }
-      
-      Line* makeLine(std::tr1::shared_ptr<MrFusion::IFile>& file, int lineNumber);
-      Line* makeLine(std::tr1::shared_ptr<MrFusion::IFile>& file, int lineNumber, boost::variant<Data*, Instruction*, Label*> contents);
+      std::tr1::shared_ptr<IFile> currentFile();
+      int nextLineNumber();
+      Line* makeLine(std::tr1::shared_ptr<MrFusion::IFile> file, int lineNumber);
+      Line* makeLine(std::tr1::shared_ptr<MrFusion::IFile> file, int lineNumber, boost::variant<Data*, Instruction*, Label*> contents);
       Instruction* makeInstruction(Opcode opCode, Operand first);
       Instruction* makeInstruction(Opcode opCode, Operand first, Operand second);
       Data* makeData(std::vector<uint16_t> data);
