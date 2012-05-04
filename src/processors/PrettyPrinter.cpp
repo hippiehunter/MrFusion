@@ -1,6 +1,6 @@
-#include "PrettyPrinter.h"
+#include "processors/PrettyPrinter.h"
 
-#include<iomanip>
+#include <iomanip>
 #include <boost/variant.hpp>
 
 using MrFusion::Processors::PrettyPrinter;
@@ -48,7 +48,6 @@ namespace
       apply_visitor(proc, op.first);
       
       _output << _preIndentation << "expression operator:" << expressionKindNames[op.kind] << endl;
-      
       apply_visitor(proc, op.second);
     }
     

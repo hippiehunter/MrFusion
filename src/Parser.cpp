@@ -6,8 +6,10 @@
 #include <vector>
 #include <string>
 
+#include <boost/spirit/include/phoenix_function.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/variant.hpp>
+
 
 using namespace MrFusion::Ast;
 using MrFusion::IFileFactory;
@@ -171,5 +173,5 @@ AsmParser::AsmParser()
 vector<string> AsmParser::parseIt(const string& data, const string& fileName)
 {
   auto file = IFileFactory::makeFile(fileName);
-  phrase_parse(file->contents()->begin(), file->contents()->end(), DCPU16AssemblyGrammar<string::iterator>(_context), space_type(), skip_flag::postskip);
+  qi::phrase_parse(file->contents()->begin(), file->contents()->end(), DCPU16AssemblyGrammar<string::iterator>(_context), space_type(), skip_flag::postskip);
 }

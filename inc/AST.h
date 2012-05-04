@@ -147,6 +147,11 @@ namespace MrFusion
       boost::optional<uint16_t> computedAddress;
     };
     
+    struct BasicBlock
+    {
+      std::vector<Instruction*> members;
+    }
+    
     class GlobalContext
     {
     public:
