@@ -18,6 +18,10 @@ using MrFusion::AsmParser;
 using MrFusion::ParserUtils::attach_statement_impl;
 using MrFusion::ParserUtils::make_line_empty_impl;
 using MrFusion::ParserUtils::make_line_impl;
+using MrFusion::ParserUtils::make_label_impl;
+using MrFusion::ParserUtils::make_unary_instruction_impl;
+using MrFusion::ParserUtils::make_binary_instruction_impl;
+using MrFusion::ParserUtils::make_operand_impl;
 
 using boost::spirit::qi::symbols;
 using boost::spirit::qi::grammar;
@@ -99,7 +103,6 @@ namespace
 	("IFN", Opcode::IFN)
 	("IFG", Opcode::IFG)
 	("IFB", Opcode::IFB)
-	("JSR", Opcode::JSR)
       ;
     }
   } binaryOpcodes;
@@ -126,6 +129,7 @@ namespace
     rule<Iterator, uint16_t(), space_type> dat_elem;
     rule<Iterator, DerefOperand(), space_type> operand_deref;
     rule<Iterator, Operand(), space_type> operand;
+    rule<Iterator, ExpressionOperand(), space_type> compound_expr;
     rule<Iterator, Instruction*(), space_type> instr;
     rule<Iterator, Data*(), space_type> dat;
     rule<Iterator, Line*(), qi::locals<Label*>, space_type> line;
@@ -140,24 +144,43 @@ namespace
       phx::function<make_line_empty_impl> make_line_empty;
       phx::function<make_line_impl> make_line;
       phx::function<attach_statement_impl> attach_statement;
-      //phx::function<make_label_impl> make_label(;
+      phx::function<make_label_impl> make_label;
+      phx::function<make_unary_instruction_impl> make_unary_instruction;
+      phx::function<make_binary_instruction_impl> make_binary_instruction;
+      phx::function<make_operand_impl> make_operand;
       
       start = *(line);
       
       line = newLine[qi::_val = make_line_empty(phx::ref(c))]
-      | comment[qi::_val = make_line_empty(phx::ref(c))] >> -(newLine)
+	| comment[qi::_val = make_line_empty(phx::ref(c))] >> -(newLine)
+	
+	| statement[qi::_val = make_line(qi::_1, phx::ref(c))] >> 
+	  -(comment) >> -(newLine)
+	  
+	| label[qi::_a = qi::_1] >> 
+	  statement[qi::_val = make_line(attach_statement(qi::_a, qi::_1), phx::ref(c))] >>
+	  -(comment) >> -(newLine)
+	  
+	| label[qi::_val = make_line(qi::_1, phx::ref(c))] >> 
+	  -(newLine);
+	
+      label = qi::lit(':') > symbol[qi::_val = make_label(qi::_1, phx::ref(c))];
       
-      | statement[qi::_val = make_line(qi::_1, phx::ref(c))] >> 
-	-(comment) >> -(newLine)
+      statement = dat
+	| instr;
 	
-      | label[qi::_a = qi::_1] >> 
-	statement[qi::_val = make_line(attach_statement(qi::_a, qi::_1), phx::ref(c))] >>
-	-(comment) >> -(newLine)
-	
-      | label[qi::_val = make_line(qi::_1, phx::ref(c))] >> 
-	-(newLine);
-	
-      //label = lit(':') > symbol[qi::_val = make_label(qi::_1)];
+      instr = (qi::no_case[binaryOpcodes] > 
+		operand > qi::lit(',') > 
+		operand)[make_binary_instruction(qi::_1, qi::_2, qi::_3, phx::ref(c))]
+		
+	    | (qi::no_case[unaryOpcodes] > 
+		operand)[make_unary_instruction(qi::_1, qi::_2, phx::ref(c))];
+		
+      operand = qi::no_case[specialOperands[make_operand(qi::_1)]]
+	| qi::no_case[gpRegisters[make_operand(qi::_1)]]
+	| expr[make_operand(qi::_1)]
+	| compound_expr
+	| operand_deref;
     }
   };
 }

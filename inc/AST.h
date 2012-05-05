@@ -162,8 +162,8 @@ namespace MrFusion
       Line* makeLine(std::tr1::shared_ptr<MrFusion::IFile> file, int lineNumber, boost::variant<Data*, Instruction*, Label*> contents);
       Instruction* makeInstruction(Opcode opCode, Operand first);
       Instruction* makeInstruction(Opcode opCode, Operand first, Operand second);
-      Data* makeData(std::vector<uint16_t> data);
-      Label* makeLabel(std::string name);
+      Data* makeData(const std::vector<uint16_t>& data);
+      Label* makeLabel(const std::string& name);
       std::tr1::shared_ptr<MrFusion::ErrorReporting> errorReporting();
     private:
       std::vector<std::tr1::shared_ptr<MrFusion::IFile>> _files;
