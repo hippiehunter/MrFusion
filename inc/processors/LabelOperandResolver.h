@@ -1,5 +1,5 @@
-#ifndef MRFUSION_PROCESSORS_LABEL_NAME_RESOLVER_H
-#define MRFUSION_PROCESSORS_LABEL_NAME_RESOLVER_H
+#ifndef MRFUSION_PROCESSORS_LABEL_OPERAND_RESOLVER_H
+#define MRFUSION_PROCESSORS_LABEL_OPERAND_RESOLVER_H
 #include "AST.h"
 
 #include <string>
@@ -10,7 +10,7 @@ namespace MrFusion
 {
   namespace Processors
   {
-    class LabelNameResolver
+    class LabelOperandResolver
     {
     public:
       void operator()(MrFusion::Ast::Line* line);

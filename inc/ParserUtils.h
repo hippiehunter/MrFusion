@@ -9,65 +9,34 @@ namespace MrFusion
   {
     struct make_line_impl
     {
-      MrFusion::Ast::GlobalContext* _context;
-      make_line_impl(MrFusion::Ast::GlobalContext* context)
+      template <typename Arg, typename Context>
+      MrFusion::Ast::Line* operator()(Arg const & content, Context const& context) const
       {
-	_context = context;
+	return context->makeLine(context->currentFile(), context->nextLineNumber(), content);
       }
-      
-      template <typename Sig>
-      struct result;
-      
-      template <typename This, typename Arg>
-      struct result<This(Arg const &)>
-      {
-	typedef MrFusion::Ast::Line* type;
-      };
-      template <typename Arg>
-      MrFusion::Ast::Line* operator()(Arg const & content)
-      {
-	return _context->makeLine(_context->currentFile(), _context->nextLineNumber(), content);
-      }
+      template <typename Arg, typename Context> struct result { typedef MrFusion::Ast::Line* type; };
     };
     
     struct make_line_empty_impl
     {
-      MrFusion::Ast::GlobalContext* _context;
-      make_line_empty_impl(MrFusion::Ast::GlobalContext* context)
+      template <typename Context>
+      MrFusion::Ast::Line* operator()(Context const& context) const
       {
-	_context = context;
+	return context->makeLine(context->currentFile(), context->nextLineNumber());
       }
-      
-      template <typename Sig>
-      struct result;
-      
-      template <typename This>
-      struct result<This()>
-      {
-	typedef MrFusion::Ast::Line* type;
-      };
-      MrFusion::Ast::Line* operator()()
-      {
-	return _context->makeLine(_context->currentFile(), _context->nextLineNumber());
-      }
+      template <typename Context> struct result { typedef MrFusion::Ast::Line* type; };
     };
     
     //attaches a statement as the target of a label
     struct attach_statement_impl
     {      
-      template <typename Sig>
-      struct result;
-      
-      template <typename This, typename Arg1, typename Arg2>
-      struct result<This(Arg1 const &, Arg2 const&)>
-      {
-	typedef void type;
-      };
       template <typename Arg1, typename Arg2>
-      void operator()(Arg1 const& label, Arg2 const& statement)
+      const Arg1& operator()(Arg1 const& label, Arg2 const& statement) const
       {
 	label->target = statement;
+	return label;
       }
+      template <typename Arg1, typename Arg2> struct result { typedef Arg1 type; };
     };
     
   }

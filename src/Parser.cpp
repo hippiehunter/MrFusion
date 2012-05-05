@@ -6,7 +6,7 @@
 #include <vector>
 #include <string>
 
-#include <boost/spirit/include/phoenix_function.hpp>
+#include <boost/spirit/include/phoenix.hpp>
 #include <boost/spirit/include/qi.hpp>
 #include <boost/variant.hpp>
 
@@ -136,27 +136,28 @@ namespace
     DCPU16AssemblyGrammar(GlobalContext* c)
       : DCPU16AssemblyGrammar::base_type(start)
     {
-      make_line_empty_impl mlei(c);
-      make_line_impl mli(c);
-      
-      phx::function<make_line_empty_impl> make_line_empty(mlei);
-      phx::function<make_line_impl> make_line(mli);
+
+      phx::function<make_line_empty_impl> make_line_empty;
+      phx::function<make_line_impl> make_line;
       phx::function<attach_statement_impl> attach_statement;
+      //phx::function<make_label_impl> make_label(;
       
       start = *(line);
       
-      line = newLine[qi::_val = make_line_empty()]
-      | comment[qi::_val = make_line_empty()]
+      line = newLine[qi::_val = make_line_empty(phx::ref(c))]
+      | comment[qi::_val = make_line_empty(phx::ref(c))] >> -(newLine)
       
-      | statement[qi::_val = make_line(qi::_1)] >> 
+      | statement[qi::_val = make_line(qi::_1, phx::ref(c))] >> 
 	-(comment) >> -(newLine)
 	
       | label[qi::_a = qi::_1] >> 
-	statement[qi::_val = make_line(attach_statement(qi::_a, qi::_1))] >>
+	statement[qi::_val = make_line(attach_statement(qi::_a, qi::_1), phx::ref(c))] >>
 	-(comment) >> -(newLine)
 	
-      | label[qi::_val = make_line(qi::_1)] >> 
+      | label[qi::_val = make_line(qi::_1, phx::ref(c))] >> 
 	-(newLine);
+	
+      //label = lit(':') > symbol[qi::_val = make_label(qi::_1)];
     }
   };
 }

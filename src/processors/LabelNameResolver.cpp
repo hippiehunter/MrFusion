@@ -46,13 +46,13 @@ namespace
       auto existingLabel = _labelTable->find(label->name);
       if(existingLabel != _labelTable->end())
       {
-	_errorReporting->addError(format("duplicate label detected: %s, first encountered at %s(%d)", 
-					 label->name, existingLabel->line->file.lock()->fileName(), existingLabel->line->lineNumber),
+	_errorReporting->addError(str(format("duplicate label detected: %s, first encountered at %s(%d)") % 
+					 label->name % existingLabel->second->line->file.lock()->fileName() % existingLabel->second->line->lineNumber),
 				  label->line->lineNumber, 0, label->line->file.lock()->fileName());
       }
       else
       {
-	_labelTable[label->name] = label;
+	(*_labelTable)[label->name] = label;
       }
     }
   };

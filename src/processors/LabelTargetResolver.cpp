@@ -4,7 +4,7 @@
 #include <boost/variant.hpp>
 #include <boost/format.hpp>
 
-using MrFusion::Processors::LabelNameResolver;
+using MrFusion::Processors::LabelTargetResolver;
 using MrFusion::ErrorReporting;
 using namespace MrFusion::Ast;
 

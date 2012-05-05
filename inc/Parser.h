@@ -1,5 +1,6 @@
 #ifndef MRFUSION_PARSER_H
 #define MRFUSION_PARSER_H
+
 #include "AST.h"
 
 namespace MrFusion

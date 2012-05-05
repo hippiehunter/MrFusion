@@ -39,18 +39,16 @@ namespace
     {
       ProcOperand proc(_labelTable, _errorReporting);
       apply_visitor(proc, op.first);
-      
-      if(op.second)
-	apply_visitor(proc, op.second);
+      apply_visitor(proc, op.second);
     }
     
     void operator()(LabelOperand& op)
     {
       //generate and unresolved label error if we cant find this
-      auto foundLabel = _labelTable.find(op.symbolName);
+      auto foundLabel = _labelTable->find(op.symbolName);
       if(foundLabel != _labelTable->end())
       {
-	op.target = *foundLabel;
+	op.target = foundLabel->second;
       }
       else
       {
