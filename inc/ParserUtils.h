@@ -83,6 +83,20 @@ namespace MrFusion
       struct result { typedef MrFusion::Ast::Instruction* type; };
     };
     
+    template<typename RetType>
+    struct ProcExpr : public boost::static_visitor<RetType>
+    {
+      RetType operator()(uint16_t const& data) const
+      {
+	return MrFusion::Ast::LiteralOperand { data };
+      }
+      
+      RetType operator()(std::string const& name) const
+      {
+	return MrFusion::Ast::LabelOperand { name };
+      }
+    };
+    
     struct make_operand_impl
     {
       MrFusion::Ast::Operand operator()(MrFusion::Ast::Register const& reg) const
@@ -97,24 +111,37 @@ namespace MrFusion
       
       MrFusion::Ast::Operand operator()(boost::variant<uint16_t, std::string> const& expr) const
       {
-	struct ProcExpr : public boost::static_visitor<MrFusion::Ast::Operand>
-	{
-	  MrFusion::Ast::Operand operator()(uint16_t const& data) const
-	  {
-	    return MrFusion::Ast::LiteralOperand { data };
-	  }
-	  
-	  MrFusion::Ast::Operand operator()(std::string const& name) const
-	  {
-	    return MrFusion::Ast::LabelOperand { name };
-	  }
-	};
-	
-	return boost::apply_visitor(ProcExpr(), expr);
+	return boost::apply_visitor(ProcExpr<MrFusion::Ast::Operand>(), expr);
       }
       
       
       template <typename Arg1> struct result { typedef MrFusion::Ast::Operand type; };
+    };
+    
+    struct make_deref_operand_impl
+    {
+      MrFusion::Ast::DerefOperand operator()(MrFusion::Ast::Register const& reg) const
+      {
+	return MrFusion::Ast::DerefOperand { MrFusion::Ast::RegisterOperand { reg } };
+      }
+      
+      MrFusion::Ast::DerefOperand operator()(MrFusion::Ast::ExpressionOperand const& expOp) const
+      {
+	return MrFusion::Ast::DerefOperand { expOp };
+      }
+      
+      MrFusion::Ast::DerefOperand operator()(boost::variant<uint16_t, std::string> const& expr) const
+      {
+	return MrFusion::Ast::DerefOperand { 
+	  boost::apply_visitor(ProcExpr<typename MrFusion::Ast::DerefOperand::element_type>(), expr) };
+      }
+      
+      
+      template <typename Arg1> struct result { typedef MrFusion::Ast::Operand type; };
+    };
+    
+    struct make_compound_expr_impl
+    {
     };
   }
 }

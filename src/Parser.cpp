@@ -22,6 +22,7 @@ using MrFusion::ParserUtils::make_label_impl;
 using MrFusion::ParserUtils::make_unary_instruction_impl;
 using MrFusion::ParserUtils::make_binary_instruction_impl;
 using MrFusion::ParserUtils::make_operand_impl;
+using MrFusion::ParserUtils::make_deref_operand_impl;
 
 using boost::spirit::qi::symbols;
 using boost::spirit::qi::grammar;
@@ -148,6 +149,7 @@ namespace
       phx::function<make_unary_instruction_impl> make_unary_instruction;
       phx::function<make_binary_instruction_impl> make_binary_instruction;
       phx::function<make_operand_impl> make_operand;
+      phx::function<make_deref_operand_impl> make_deref_operand;
       
       start = *(line);
       
@@ -181,6 +183,17 @@ namespace
 	| expr[make_operand(qi::_1)]
 	| compound_expr
 	| operand_deref;
+	
+      operand_deref = qi::lit('[') >> qi::no_case[gpRegisters[make_deref_operand(qi::_1)]] >> ']'
+	| qi::lit('[') >> expr[make_deref_operand(qi::_1)] >> ']'
+	| qi::lit('[') >> compound_expr[make_deref_operand(qi::_1)] >> ']';
+	
+      /*compound_expr = 
+	(expr >> '+' >> no_case[gpRegisters])
+	  [make_compound_expr(phx::val(ExpressionKind::Plus), qi::_1, qi::_2)]
+	
+	| (no_case[gpRegisters] >> '+' >> expr)
+	  [make_compound_expr(phx::val(ExpressionKind::Plus), qi::_2, qi::_1)];*/
     }
   };
 }
