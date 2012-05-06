@@ -137,11 +137,26 @@ namespace MrFusion
       }
       
       
-      template <typename Arg1> struct result { typedef MrFusion::Ast::Operand type; };
+      template <typename Arg1> struct result { typedef MrFusion::Ast::DerefOperand type; };
     };
     
     struct make_compound_expr_impl
     {
+      MrFusion::Ast::ExpressionOperand operator()(MrFusion::Ast::ExpressionKind const& kind,
+						  boost::variant<uint16_t, std::string> const& left,
+						  MrFusion::Ast::Register const& right) const
+      {
+	return MrFusion::Ast::ExpressionOperand
+	{
+	  boost::apply_visitor(ProcExpr<typename MrFusion::Ast::ExpressionOperand::element_type>(), left),
+	  MrFusion::Ast::RegisterOperand { right },
+	  kind
+	};
+      }
+      
+      
+      template <typename Arg1, typename Arg2, typename Arg3>
+      struct result { typedef MrFusion::Ast::ExpressionOperand type; };
     };
   }
 }

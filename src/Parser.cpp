@@ -23,6 +23,7 @@ using MrFusion::ParserUtils::make_unary_instruction_impl;
 using MrFusion::ParserUtils::make_binary_instruction_impl;
 using MrFusion::ParserUtils::make_operand_impl;
 using MrFusion::ParserUtils::make_deref_operand_impl;
+using MrFusion::ParserUtils::make_compound_expr_impl;
 
 using boost::spirit::qi::symbols;
 using boost::spirit::qi::grammar;
@@ -150,6 +151,7 @@ namespace
       phx::function<make_binary_instruction_impl> make_binary_instruction;
       phx::function<make_operand_impl> make_operand;
       phx::function<make_deref_operand_impl> make_deref_operand;
+      phx::function<make_compound_expr_impl> make_compound_expr;
       
       start = *(line);
       
@@ -188,12 +190,29 @@ namespace
 	| qi::lit('[') >> expr[make_deref_operand(qi::_1)] >> ']'
 	| qi::lit('[') >> compound_expr[make_deref_operand(qi::_1)] >> ']';
 	
-      /*compound_expr = 
-	(expr >> '+' >> no_case[gpRegisters])
+      compound_expr = 
+	(expr >> '+' >> qi::no_case[gpRegisters])
 	  [make_compound_expr(phx::val(ExpressionKind::Plus), qi::_1, qi::_2)]
 	
-	| (no_case[gpRegisters] >> '+' >> expr)
-	  [make_compound_expr(phx::val(ExpressionKind::Plus), qi::_2, qi::_1)];*/
+	| (qi::no_case[gpRegisters] >> '+' >> expr)
+	  [make_compound_expr(phx::val(ExpressionKind::Plus), qi::_2, qi::_1)];
+	  
+      symbol %= qi::alpha >> *(qi::alnum);
+    
+      expr = symbol
+	| qi::lexeme[qi::no_case["0x"] > qi::hex]
+	| qi::ushort_;
+	
+      //dat = qi::lexeme[qi::no_case["dat"]] > datlist[attachDatList];
+      
+      datlist = quoted_string
+	| dat_elem % ',';
+	
+      dat_elem = qi::lexeme[qi::no_case["0x"] > qi::hex]
+	| qi::ushort_;
+	
+      newLine = qi::eol;
+      comment = ';' >> *(qi::char_) >> -(newLine);
     }
   };
 }
