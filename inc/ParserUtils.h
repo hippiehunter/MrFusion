@@ -153,10 +153,34 @@ namespace MrFusion
 	  kind
 	};
       }
-      
-      
       template <typename Arg1, typename Arg2, typename Arg3>
       struct result { typedef MrFusion::Ast::ExpressionOperand type; };
+    };
+    
+    struct make_datlist_impl
+    {
+      MrFusion::Ast::Data* operator()(boost::variant<std::string, std::vector<uint16_t>> const& raw, MrFusion::Ast::GlobalContext* const& context) const
+      {
+	struct convertToRaw
+	  : public boost::static_visitor<const std::vector<uint16_t>>
+	{
+	public:
+	  const std::vector<uint16_t> operator()( const std::string & operand ) const
+	  {
+	    std::vector<uint16_t> result;
+	    for(auto ch : operand)
+	      result.push_back(ch);
+	    return result;
+	  }
+	  const std::vector<uint16_t> operator()(const std::vector<uint16_t>& operand ) const
+	  {
+	    return operand;
+	  }
+	};
+	return context->makeData(boost::apply_visitor(convertToRaw(), raw));
+      }
+      template <typename Arg1, typename Arg2>
+      struct result { typedef MrFusion::Ast::Data* type; };
     };
   }
 }

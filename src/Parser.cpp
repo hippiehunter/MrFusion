@@ -24,6 +24,7 @@ using MrFusion::ParserUtils::make_binary_instruction_impl;
 using MrFusion::ParserUtils::make_operand_impl;
 using MrFusion::ParserUtils::make_deref_operand_impl;
 using MrFusion::ParserUtils::make_compound_expr_impl;
+using MrFusion::ParserUtils::make_datlist_impl;
 
 using boost::spirit::qi::symbols;
 using boost::spirit::qi::grammar;
@@ -152,21 +153,22 @@ namespace
       phx::function<make_operand_impl> make_operand;
       phx::function<make_deref_operand_impl> make_deref_operand;
       phx::function<make_compound_expr_impl> make_compound_expr;
+      phx::function<make_datlist_impl> make_datlist;
       
-      start = *(line);
+      start = line % newLine;
       
-      line = newLine[qi::_val = make_line_empty(phx::ref(c))]
-	| comment[qi::_val = make_line_empty(phx::ref(c))] >> -(newLine)
+      line = comment[qi::_val = make_line_empty(phx::ref(c))]
 	
 	| statement[qi::_val = make_line(qi::_1, phx::ref(c))] >> 
-	  -(comment) >> -(newLine)
+	  -(comment)
 	  
 	| label[qi::_a = qi::_1] >> 
 	  statement[qi::_val = make_line(attach_statement(qi::_a, qi::_1), phx::ref(c))] >>
-	  -(comment) >> -(newLine)
+	  -(comment)
 	  
-	| label[qi::_val = make_line(qi::_1, phx::ref(c))] >> 
-	  -(newLine);
+	| label[qi::_val = make_line(qi::_1, phx::ref(c))]
+	  
+	| qi::eps[qi::_val = make_line_empty(phx::ref(c))];
 	
       label = qi::lit(':') > symbol[qi::_val = make_label(qi::_1, phx::ref(c))];
       
@@ -203,7 +205,7 @@ namespace
 	| qi::lexeme[qi::no_case["0x"] > qi::hex]
 	| qi::ushort_;
 	
-      //dat = qi::lexeme[qi::no_case["dat"]] > datlist[attachDatList];
+      dat = qi::lexeme[qi::no_case["dat"]] > datlist[make_datlist(qi::_1, phx::ref(c))];
       
       datlist = quoted_string
 	| dat_elem % ',';
@@ -219,15 +221,20 @@ namespace
 
 AsmParser::~AsmParser()
 {
+  if(_context != nullptr)
+    delete _context;
 }
 
 AsmParser::AsmParser()
 {
-  
+  _context = new GlobalContext();
 }
 
-vector<string> AsmParser::parseIt(const string& data, const string& fileName)
+GlobalContext* AsmParser::context() { return _context; }
+
+void AsmParser::parseIt(const string& data, const string& fileName)
 {
   auto file = IFileFactory::makeFile(fileName);
+  _context->addFile(file);
   qi::phrase_parse(file->contents()->begin(), file->contents()->end(), DCPU16AssemblyGrammar<string::iterator>(_context), space_type(), skip_flag::postskip);
 }

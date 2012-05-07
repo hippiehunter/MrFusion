@@ -12,6 +12,7 @@ namespace MrFusion
     class PrettyPrinter
     {
     public:
+      PrettyPrinter(std::ostream& output) : _output(output){}
       void operator()(MrFusion::Ast::Line* line);
     private:
       std::ostream& _output;

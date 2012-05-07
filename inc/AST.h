@@ -151,6 +151,12 @@ namespace MrFusion
     class GlobalContext
     {
     public:
+      
+      GlobalContext()
+      {
+	_errorReporting = std::tr1::shared_ptr<MrFusion::ErrorReporting>(new MrFusion::ErrorReporting());
+      }
+      
       template<typename F>
       void processLines(F& f)
       {
@@ -158,6 +164,7 @@ namespace MrFusion
       }
       std::tr1::shared_ptr<IFile> currentFile();
       int nextLineNumber();
+      void addFile(const std::tr1::shared_ptr<IFile>& file);
       Line* makeLine(std::tr1::shared_ptr<MrFusion::IFile> file, int lineNumber);
       Line* makeLine(std::tr1::shared_ptr<MrFusion::IFile> file, int lineNumber, boost::variant<Data*, Instruction*, Label*> contents);
       Instruction* makeInstruction(Opcode opCode, Operand first);
@@ -169,10 +176,14 @@ namespace MrFusion
       std::vector<std::tr1::shared_ptr<MrFusion::IFile>> _files;
       std::vector<Line*> _lines;
       
+      int _currentLine;
+      
       boost::object_pool<Line> _linePool;
       boost::object_pool<Instruction> _instructionPool;
       boost::object_pool<Data> _dataPool;
       boost::object_pool<Label> _labelPool;
+      std::tr1::shared_ptr<MrFusion::ErrorReporting> _errorReporting;
+      
     };
   }
 }
